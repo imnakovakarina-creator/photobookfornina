@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AR Фотобук</title>
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <style>
+    #play-button {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 15px 30px;
+      font-size: 20px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      z-index: 100;
+      cursor: pointer;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+      transition: background-color 0.3s;
+    }
+    #play-button:hover {
+      background-color: #45a049;
+    }
+    #play-button:disabled {
+      background-color: #aaa;
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+  </style>
+</head>
+<body>
+
+  <button id="play-button" disabled>Загрузка видео...</button>
+
+  <a-scene 
+    mindar-image="imageTargetSrc: ./targets.mind;" 
+    vr-mode-ui="enabled: false" 
+    device-orientation-permission-ui="enabled: true"
+  >
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+    <a-entity mindar-image-target="targetIndex: 0">
+      <!-- Убираем autoplay и loop, добавляем preload="none" и muted -->
+      <a-video 
+        id="ar-video"
+        src="./video.mp4" 
+        width="1" 
+        height="0.5625" 
+        position="0 0 0" 
+        rotation="0 0 0" 
+        scale="0.5 0.5 0.5" 
+        preload="none"
+        muted
+      ></a-video>
+    </a-entity>
+  </a-scene>
+
+  <script>
+    (function() {
+      const button = document.getElementById('play-button');
+      let videoElement = null;
+
+      // Функция получения HTMLVideoElement из a-video
+      function getVideoElement() {
+        const videoComp = document.querySelector('#ar-video');
+        if (!videoComp) return null;
+        const material = videoComp.components.material;
+        if (!material) return null;
+        const texture = material.material.map;
+        if (!texture) return null;
+        return texture.image; // это HTMLVideoElement
+      }
+
+      // Принудительно останавливаем видео и отключаем звук
+      function stopVideo() {
+        const vid = getVideoElement();
+        if (vid) {
+          vid.pause();
+          vid.currentTime = 0;
+          vid.muted = true; // дублируем для уверенности
+          vid.volume = 0;   // дополнительно обнуляем громкость
+        }
+      }
+
+      // Проверка готовности видео (загружено хотя бы немного)
+      function checkVideoReady() {
+        videoElement = getVideoElement();
+        if (videoElement) {
+          // Останавливаем, если вдруг запустилось
+          stopVideo();
+          // Проверяем, загружено ли видео (readyState >= 2)
+          if (videoElement.readyState >= 2) {
+            button.disabled = false;
+            button.textContent = '▶ Начать воспроизведение';
+          } else {
+            setTimeout(checkVideoReady, 300);
+          }
+        } else {
+          setTimeout(checkVideoReady, 300);
+        }
+      }
+
+      // Запуск видео по клику
+      button.addEventListener('click', function() {
+        if (videoElement) {
+          // Включаем звук (если нужно) — но мы оставляем muted, чтобы не было звука
+          // Если всё же хотите звук — раскомментируйте строку ниже
+          // videoElement.muted = false;
+          videoElement.volume = 1; // если нужен звук, установите 1
+          videoElement.play().then(() => {
+            button.style.display = 'none'; // скрываем кнопку
+          }).catch(function(err) {
+            console.warn('Не удалось запустить видео:', err);
+            alert('Пожалуйста, коснитесь экрана и попробуйте снова.');
+          });
+        }
+      });
+
+      // Ждём загрузку страницы и сцены
+      window.addEventListener('load', function() {
+        setTimeout(checkVideoReady, 1000);
+      });
+
+      document.querySelector('a-scene').addEventListener('loaded', function() {
+        setTimeout(checkVideoReady, 500);
+      });
+
+    })();
+  </script>
+</body>
+</html>
